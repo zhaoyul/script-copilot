@@ -1,0 +1,130 @@
+{
+  "name": "deepseek-csharp-assistant",
+  "displayName": "DeepSeek C# Assistant",
+  "description": "VS Code extension for generating C# code with DeepSeek and running dotnet tests.",
+  "version": "0.1.0",
+  "publisher": "your-publisher",
+  "license": "MIT",
+  "main": "./out/extension.js",
+  "icon": "resources/icon.svg",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:deepseekCSharp.assist",
+    "onLanguage:csharp"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "deepseekCSharp.assist",
+        "title": "DeepSeek: C# Assist"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "deepseekCSharp.assist",
+          "when": "editorLangId == csharp",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "DeepSeek C# Assistant",
+      "properties": {
+        "deepseekCSharp.assistant.apiUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Endpoint for DeepSeek generation requests."
+        },
+        "deepseekCSharp.assistant.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key used for DeepSeek requests (store securely)."
+        },
+        "deepseekCSharp.assistant.model": {
+          "type": "string",
+          "default": "deepseek-code-1",
+          "description": "Model name used for generation."
+        },
+        "deepseekCSharp.assistant.timeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "Timeout for LLM requests in milliseconds."
+        },
+        "deepseekCSharp.assistant.maxTokens": {
+          "type": "number",
+          "default": 1024,
+          "description": "Maximum tokens to request from the LLM."
+        },
+        "deepseekCSharp.assistant.temperature": {
+          "type": "number",
+          "default": 0,
+          "description": "Sampling temperature for responses."
+        },
+        "deepseekCSharp.assistant.autoRunTests": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run dotnet tests automatically after applying changes."
+        },
+        "deepseekCSharp.assistant.testsCommand": {
+          "type": "string",
+          "default": "dotnet test --logger \\\"trx;LogFileName=results.trx\\\" --results-directory ./deepseek_test_results",
+          "description": "Command used to execute dotnet tests."
+        },
+        "deepseekCSharp.assistant.runTestsOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run configured tests when a C# file is saved."
+        },
+        "deepseekCSharp.assistant.showTestOutputPanel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show output panel with test logs."
+        },
+        "deepseekCSharp.assistant.contextLines": {
+          "type": "number",
+          "default": 30,
+          "description": "Number of surrounding lines to include in prompts."
+        },
+        "deepseekCSharp.assistant.promptTemplatePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional workspace path to override the default prompt template."
+        },
+        "deepseekCSharp.assistant.maxConcurrentRequests": {
+          "type": "number",
+          "default": 2,
+          "description": "Maximum concurrent LLM requests."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run build"
+  },
+  "keywords": [
+    "vscode",
+    "csharp",
+    "assistant",
+    "deepseek"
+  ],
+  "dependencies": {
+    "fast-xml-parser": "^4.4.1",
+    "node-fetch": "^2.6.12"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.96",
+    "@types/node-fetch": "^2.6.4",
+    "@types/vscode": "^1.70.0",
+    "typescript": "^5.4.5"
+  }
+}
