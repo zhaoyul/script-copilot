@@ -52,6 +52,11 @@
           "default": "deepseek-code-1",
           "description": "Model name used for generation."
         },
+        "deepseekCSharp.assistant.useChatApi": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use chat-style API payloads (messages) instead of prompt-only payloads."
+        },
         "deepseekCSharp.assistant.timeoutMs": {
           "type": "number",
           "default": 30000,
@@ -74,7 +79,7 @@
         },
         "deepseekCSharp.assistant.testsCommand": {
           "type": "string",
-          "default": "dotnet test --logger \\\"trx;LogFileName=results.trx\\\" --results-directory ./deepseek_test_results",
+          "default": "dotnet test --logger \"trx;LogFileName=results.trx\" --results-directory ./deepseek_test_results",
           "description": "Command used to execute dotnet tests."
         },
         "deepseekCSharp.assistant.runTestsOnSave": {
