@@ -1,0 +1,236 @@
+#+TITLE: DeepSeek C# Assistant — README
+#+AUTHOR: (项目)
+#+DATE: <2026-01-07>
+
+- 概要
+DeepSeek C# Assistant 是一个基于 VS Code 的独立扩展.用于辅助编写 C# 脚本与项目内 C# 文件.  
+重要:本扩展为独立实现.不包含,复用或分发微软 Copilot/任何微软专有实现或模型.扩展通过配置的外部 LLM(示例:DeepSeek)进行代码生成.并在用户确认后自动运行单元测试以保证生成代码质量.扩展提供独立 UI(Webview)和自定义 SVG 图标.
+
+- 目标用户
+- 需要在 VS Code 中快速生成或补全 C# 代码的开发者
+- 希望在生成代码后自动运行 dotnet 单元测试并获得可视化反馈的团队或个人
+- 在受控环境中使用私有或托管 LLM 的企业用户
+
+- 主要特性
+- 针对 C# 文件(languageId == "csharp")启用的智能代码生成
+- 生成后在临时编辑器预览,接受或拒绝变更
+- 确认写入后自动运行 dotnet test(可配置)并以 TRX/JSON 格式解析结果
+- Webview 独立 UI:显示生成进度,历史,测试结果与控制操作(回滚,重试)
+- 可配置 LLM 接入(apiUrl,apiKey,model,超时,并发等)
+- 自定义 SVG 图标(resources/icon.svg)
+- 错误与异常处理:请求超时,401,测试失败时提供回退方案
+
+- 快速开始
+1. 克隆仓库.
+2. 在 VS Code 设置或 workspace settings.json 中配置接口与密钥(参见配置节).
+3. npm install && npm run build.
+4. 在扩展根目录按 F5 启动 Extension Development Host.
+5. 打开 .cs 文件.使用命令面板运行 "DeepSeek: C# Assist".
+
+- 配置(settings.json 示例)
+#+BEGIN_SRC json
+{
+  "deepseekCSharp.assistant.apiUrl": "https://api.deepseek.example/v1/generate",
+  "deepseekCSharp.assistant.apiKey": "<YOUR_API_KEY>",
+  "deepseekCSharp.assistant.model": "deepseek-code-1",
+  "deepseekCSharp.assistant.timeoutMs": 30000,
+  "deepseekCSharp.assistant.maxTokens": 1024,
+  "deepseekCSharp.assistant.temperature": 0.0,
+  "deepseekCSharp.assistant.autoRunTests": true,
+  "deepseekCSharp.assistant.testsCommand": "dotnet test --logger \"trx;LogFileName=results.trx\" --results-directory ./deepseek_test_results",
+  "deepseekCSharp.assistant.runTestsOnSave": false,
+  "deepseekCSharp.assistant.showTestOutputPanel": true,
+  "deepseekCSharp.assistant.contextLines": 30,
+  "deepseekCSharp.assistant.promptTemplatePath": "",
+  "deepseekCSharp.assistant.maxConcurrentRequests": 2
+}
+#+END_SRC
+
+安全提示:API Key 应使用 VS Code SecretStorage 或系统 Keychain 存储.切勿把明文 key 提交到仓库.
+
+- 设计与工作流(简要)
+1. 用户触发命令 "DeepSeek: C# Assist"(命令面板或编辑器右键菜单.仅在 C# 文件可用).  
+2. 扩展收集上下文:当前文件,光标周围 N 行(可配置),项目引用摘要,最近相关测试文件,改动补丁(如果有).  
+3. 构建 prompt(可使用可配置模板).发送到配置的 LLM(HTTP POST.Authorization: Bearer <API_KEY>).支持超时与重试(指数退避).  
+4. 接收结果并在 untitled 临时编辑器中展示给用户(只含代码片段或完整方法/类.按 prompt 要求).  
+5. 用户 Review:接受(写入目标文件),部分接受(手动编辑),拒绝(放弃).  
+6. 若用户确认写入且 autoRunTests=true:在子进程中运行 testsCommand.捕获 stdout/stderr.保存结果到 results-directory(建议 TRX).  
+7. 解析测试结果.展示在 Webview 与 Problems 面板.对于失败的测试.显示失败堆栈,相关文件,回滚与重试选项.  
+
+- 实现要点(工程师须知)
+- activationEvents: "onCommand:deepseekCSharp.assist" + "onLanguage:csharp"(package.json).
+- 命令实现入口:src/extension.ts.使用 vscode.commands.registerCommand.
+- UI: 使用 vscode.window.createWebviewPanel 构建独立 Webview.前端静态文件放在 src/ui 或 resources.
+- LLM 通信: 使用 fetch/post (node-fetch 或内置 fetch).Content-Type: application/json, Authorization: Bearer <apiKey>.实现请求超时,指数退避与并发限制.
+- Prompt 构建: 提供默认模板并允许 workspace-level 覆盖(promptTemplatePath 或 settings).
+- 生成代码展示: 打开 untitled 文档(vscode.workspace.openTextDocument({content, language:'csharp'}) 并 show).在用户确认时写入目标文件(工作区编辑 API).
+- 自动测试: 使用 child_process.spawn 或 exec 执行 testsCommand;在 spawn 时以流方式读取 stdout/stderr 并写入输出通道;建议使用 --logger "trx;LogFileName=XXX" 与 --results-directory 以便解析 TRX XML.
+- TRX 解析: 解析 XML(node xml2js 或 fast-xml-parser)以提取 test case,outcome,错误信息和堆栈追踪.将错误转换为 Diagnostic(Problems)并绑定到文件/行(若 TRX 提供文件/行信息).
+- 回滚: 在写入文件前保存文件备份(临时 copy 或 git 保存 index).若项目使用 git.优先调用 git restore 或 git checkout(使用 child_process 调用 git); 如果没有 git.使用备份文件还原.提供用户可视化回滚确认.
+- 错误处理: LLM 请求失败(网络,401,非 2xx),响应解析失败,测试超时/错误:展示清晰错误信息并提供重试与回滚选项.
+
+- package.json 关键字段示例
+#+BEGIN_SRC json
+{
+  "name": "deepseek-csharp-assistant",
+  "displayName": "DeepSeek C# Assistant",
+  "publisher": "<your-publisher>",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.70.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onCommand:deepseekCSharp.assist","onLanguage:csharp"],
+  "contributes": {
+    "commands": [{ "command": "deepseekCSharp.assist", "title": "DeepSeek: C# Assist" }],
+    "menus": {
+      "editor/context": [{ "command": "deepseekCSharp.assist", "when": "editorLangId == csharp", "group":"navigation" }]
+    },
+    "configuration": { "type":"object","properties": {
+      "deepseekCSharp.assistant.apiUrl": { "type":"string" },
+      "deepseekCSharp.assistant.apiKey": { "type":"string" }
+    }}
+  },
+  "scripts": { "vscode:prepublish":"npm run build", "build":"tsc -p ./"}
+}
+#+END_SRC
+
+- 自动单元测试执行(实现建议)
+- 命令样例(默认):  
+#+BEGIN_SRC sh
+dotnet test --logger "trx;LogFileName=results.trx" --results-directory ./deepseek_test_results
+#+END_SRC
+- 使用 TRX(XML)便于解析.解析后将失败 test 转换为 Diagnostic(Problems)或在 Webview 中展示详细报告.  
+- 若项目包含多个测试项目:通过扫描 workspace 中的 /.csproj 并识别 IsTestProject(或约定命名)来选择要运行的测试项目;允许用户手动选择测试项目.  
+- 测试优化:支持只运行与更改相关的测试(通过测试映射或基于代码覆盖/依赖分析的策略.作为后续增强).
+
+- 独立 UI 与图标
+- Webview 功能建议:生成请求列表,prompt 编辑,生成预览,测试运行日志,测试结果(分通过/失败/跳过),回滚与重试按钮,设置快捷入口.  
+- 建议图标路径: resources/icon.svg(下面提供一个可用模板).在 package.json 的 contributes/icon 或 images 指向该文件.
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect rx="20" width="128" height="128" fill="#0A84FF"/>
+  <g transform="translate(18,18)" fill="#FFF">
+    <rect x="0" y="0" width="92" height="60" rx="6" fill="#fff" opacity="0.12"/>
+    <path d="M6 12h80v6H6zM6 26h80v6H6zM6 40h50v6H6z" fill="#FFF" opacity="0.9"/>
+    <circle cx="18" cy="80" r="8" fill="#fff" opacity="0.9"/>
+    <path d="M36 74 L74 74 L86 86 L74 98 L36 98 Z" fill="#fff" opacity="0.9"/>
+  </g>
+</svg>
+#+END_SRC
+
+- 与 LLM 的交互(示例)
+- POST {apiUrl}/v1/generate  
+- Headers: Authorization: Bearer <API_KEY>, Content-Type: application/json  
+- Body 示例:
+#+BEGIN_SRC json
+{
+  "model": "deepseek-code-1",
+  "prompt": "<constructed-prompt-with-context>",
+  "max_tokens": 1024,
+  "temperature": 0.0
+}
+#+END_SRC
+- 实现细节:严格限制 prompt 中发送的敏感信息;对返回代码做静态检查(简单 lint/format)与沙箱式验证(例如禁止写入磁钥/敏感常量).
+
+- 提示工程(Prompt)范例
+- 模板要求:说明任务,提供上下文(文件当前内容/上下 N 行),测试摘要,期望返回格式(仅返回方法体或完整文件)和约束(目标框架,风格).  
+- 简短示例:
+#+BEGIN_SRC text
+You are a C# assistant. Given the following file context and unit tests, generate the missing method =Calculate= that satisfies the tests. Return only the complete method code, no explanations.
+Context:
+<CODE_BLOCK>
+Tests:
+<TEST_SUMMARY>
+Constraints: target framework net6.0, follow existing naming conventions.
+#+END_SRC
+
+- 开发者说明(环境与目录)
+- 要求:Node.js >=16, npm 或 pnpm, VS Code 最新稳定版, .NET SDK(运行 dotnet test).  
+- 推荐目录结构:
+  - package.json
+  - src/extension.ts
+  - src/llm/client.ts
+  - src/testRunner/index.ts
+  - src/ui/webview// (html,js,css)
+  - resources/icon.svg
+  - README.org
+  - tests/ (单元测试)
+- 调试:在扩展根目录运行 npm install && npm run build.然后按 F5 启动 Extension Development Host.
+
+- 错误处理与回退策略
+- 在写入文件前创建备份或利用 git stage;若测试失败或用户选择回退.优先使用 git 恢复;若不可用.使用本地备份文件还原.  
+- 对外部请求使用超时与重试(指数退避).对 4xx 错误提示用户检查 API Key 与 URL.  
+- 对生成代码进行基本静态校验(格式化,简单语法检查)并在写入前警告可能的破坏性更改.
+
+- 发布与打包
+- 本地调试:npm install && npm run build.然后 F5.  
+- 打包:使用 vsce 或 @vscode/vsce:
+#+BEGIN_SRC sh
+npm install -g vsce
+vsce package
+#+END_SRC
+
+- 隐私与合规
+- 明确记录发送给 LLM 的数据(显示摘要供用户审阅).  
+- 提供开关以模糊或剥离敏感信息(如 API keys,机密路径等).  
+- 企业建议:在内部部署 LLM 或使用私有模型以满足合规要求.
+
+- 可扩展点(Roadmap)
+- 支持其他 LLM 适配器(OpenAI,Anthropic 等)并实现统一适配层.  
+- 细粒度测试运行(仅运行受影响的测试).  
+- 多语言支持(支持更多目标语言).  
+- 持久化会话历史,离线缓存与本地 prompt 库.  
+- GUI 增强:差异视图,快速回滚,按测试分组的可视化报告.
+
+- 故障排查(常见)
+- dotnet test 无法运行:确认 workspace 是 .NET 项目并安装了 .NET SDK;检查 testsCommand 配置.  
+- LLM 请求 401/403:检查 apiUrl 与 apiKey.确认未被代理/墙拦截.  
+- 扩展未激活:检查 package.json activationEvents 与命令名是否一致.  
+- TRX 解析失败:确认 dotnet test 使用了 TRX logger 并指定了 results-directory.
+
+- 贡献与许可证
+- 建议许可证:MIT 或 Apache-2.0(在仓库根目录放 LICENSE 文件).  
+- 提交前请确保不包含任何第三方专有代码(尤其不要包含 Copilot/微软私有实现或模型).  
+- 提交流程建议:Fork → feature branch → PR → CI(lint/build)→ review → merge.  
+- 安全披露:在 README 中提供安全漏洞报告邮件或 issue 模板.
+
+- 示例快速使用流程(用户)
+1. 在 C# 文件中将光标放在需要生成/补全的位置.  
+2. 运行 "DeepSeek: C# Assist".  
+3. 编辑/确认生成结果.  
+4. 若确认.扩展写入文件并开始运行 dotnet test.  
+5. 在 Webview 或 Problems 查看测试结果;若失败.选择回滚或再次生成.
+
+- 附:示例 prompt 模板(可配置)
+#+BEGIN_SRC text
+You are a helpful, precise C# coding assistant. Given the following context and related unit tests, produce only the C# code required (a method or class) that passes the tests.
+
+Context:
+<INSERT current file content, up to N lines surrounding cursor>
+
+Tests Summary:
+<INSERT concise test names and assertions>
+
+Constraints:
+- Target framework: net6.0
+- Only return code, no explanation or comments
+- Follow existing naming conventions and styling in the file
+- Do not introduce secrets or hard-coded credentials
+
+Return format:
+- If only a method is needed, return the complete method signature and body
+- If multiple methods/classes are required, return all necessary types
+#+END_SRC
+
+- 附录:我可以接下来做的事(你选择)
+- 仅生成 README(已完成.上面内容).保存到仓库请确认.  
+- 我可以为你生成扩展骨架代码(package.json,src/extension.ts,LLM client,test runner,webview 模板,resources/icon.svg 等).这将是多文件写入任务.需要创建并管理 TODO 列表.回复 "实现代码" 我将列出待办并开始写入.  
+- 我也可以仅生成关键实现片段(extension.ts 主流程,LLM client,TRX 解析示例,webview 简单前端).以供你手工集成.
+
+以上 README 草案已覆盖功能说明,实现注意事项与开发指引.你希望我:
+- A) 直接把这个内容写回仓库的 readme.org(我会写文件).或
+- B) 现在开始生成扩展代码骨架(我会先发布 TODO 列表).或
+- C) 你还需要 README 做进一步精简/翻译成英文?
+
+请回复你的选择(A/B/C 或 其他具体要求)
