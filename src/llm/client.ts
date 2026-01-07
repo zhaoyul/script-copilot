@@ -9,6 +9,7 @@ export interface LlmClientOptions {
   maxTokens: number;
   temperature: number;
   maxConcurrentRequests: number;
+  useChatApi: boolean;
 }
 
 export interface GenerateResult {
@@ -83,12 +84,7 @@ export class LlmClient {
   }
 
   private async call(prompt: string): Promise<GenerateResult> {
-    const payload = {
-      model: this.options.model,
-      prompt,
-      max_tokens: this.options.maxTokens,
-      temperature: this.options.temperature
-    };
+    const payload = this.buildPayload(prompt);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.options.timeoutMs);
@@ -116,6 +112,19 @@ export class LlmClient {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private buildPayload(prompt: string): Record<string, unknown> {
+    const base = {
+      model: this.options.model,
+      max_tokens: this.options.maxTokens,
+      temperature: this.options.temperature
+    };
+    const prefersChat = this.options.useChatApi;
+
+    return prefersChat
+      ? { ...base, messages: [{ role: 'user', content: prompt }] }
+      : { ...base, prompt };
   }
 
   private ensureSuccess(response: Response): void {

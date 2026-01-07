@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { LlmClient } from './llm/client';
-import { runTests, TestRunResult } from './testRunner';
+import { DEFAULT_RESULTS_DIRECTORY, runTests, TestRunResult } from './testRunner';
 import { renderWebview, WebviewState } from './ui/webview';
 
 interface AssistantConfiguration {
@@ -19,9 +19,11 @@ interface AssistantConfiguration {
   contextLines: number;
   promptTemplatePath: string;
   maxConcurrentRequests: number;
+  useChatApi: boolean;
 }
 
 const CHANNEL_NAME = 'DeepSeek C# Assistant';
+const DEFAULT_TESTS_COMMAND = `dotnet test --logger "trx;LogFileName=results.trx" --results-directory ./${DEFAULT_RESULTS_DIRECTORY}`;
 let diagnostics: vscode.DiagnosticCollection | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -88,7 +90,8 @@ async function handleAssistCommand(output: vscode.OutputChannel): Promise<void> 
       timeoutMs: config.timeoutMs,
       maxTokens: config.maxTokens,
       temperature: config.temperature,
-      maxConcurrentRequests: config.maxConcurrentRequests
+      maxConcurrentRequests: config.maxConcurrentRequests,
+      useChatApi: config.useChatApi
     },
     output
   );
@@ -169,10 +172,7 @@ async function executeTests(
     return undefined;
   }
 
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const cwd = workspaceFolder ?? (vscode.window.activeTextEditor?.document.uri.fsPath
-    ? path.dirname(vscode.window.activeTextEditor.document.uri.fsPath)
-    : process.cwd());
+  const cwd = getWorkingDirectory();
 
   if (config.showTestOutputPanel) {
     output.show(true);
@@ -214,20 +214,32 @@ function publishDiagnostics(result: TestRunResult | undefined): void {
   diagnostics?.set(targetUri, entries);
 }
 
+function getWorkingDirectory(): string {
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (workspaceFolder) {
+    return workspaceFolder;
+  }
+
+  const activeFile = vscode.window.activeTextEditor?.document.uri.fsPath;
+  if (activeFile) {
+    return path.dirname(activeFile);
+  }
+
+  return process.cwd();
+}
+
 function readConfiguration(): AssistantConfiguration {
   const config = vscode.workspace.getConfiguration('deepseekCSharp.assistant');
   return {
     apiUrl: config.get<string>('apiUrl', ''),
     apiKey: config.get<string>('apiKey', ''),
     model: config.get<string>('model', 'deepseek-code-1'),
+    useChatApi: config.get<boolean>('useChatApi', false),
     timeoutMs: config.get<number>('timeoutMs', 30000),
     maxTokens: config.get<number>('maxTokens', 1024),
     temperature: config.get<number>('temperature', 0),
     autoRunTests: config.get<boolean>('autoRunTests', true),
-    testsCommand: config.get<string>(
-      'testsCommand',
-      'dotnet test --logger "trx;LogFileName=results.trx" --results-directory ./deepseek_test_results'
-    ),
+    testsCommand: config.get<string>('testsCommand', DEFAULT_TESTS_COMMAND),
     runTestsOnSave: config.get<boolean>('runTestsOnSave', false),
     showTestOutputPanel: config.get<boolean>('showTestOutputPanel', true),
     contextLines: config.get<number>('contextLines', 30),

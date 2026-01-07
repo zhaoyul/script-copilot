@@ -4,6 +4,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { XMLParser } from 'fast-xml-parser';
 
+export const DEFAULT_RESULTS_DIRECTORY = 'deepseek_test_results';
+
 export interface TestFailure {
   testName: string;
   message?: string;
@@ -30,7 +32,7 @@ export async function runTests(
   cwd: string,
   output: vscode.OutputChannel
 ): Promise<TestRunResult> {
-  const resultsDir = parseResultsDirectory(command) ?? path.join(cwd, 'deepseek_test_results');
+  const resultsDir = parseResultsDirectory(command) ?? path.join(cwd, DEFAULT_RESULTS_DIRECTORY);
   await ensureDirectory(resultsDir);
 
   return new Promise<TestRunResult>((resolve) => {
@@ -54,7 +56,7 @@ export async function runTests(
       if (trx) {
         try {
           const parsed = await parseTrx(trx);
-          parsed.success = parsed.failures.length === 0 && (code === 0 || code === null);
+          parsed.success = isSuccessful(code, parsed.failures.length);
           resolve(parsed);
           return;
         } catch (err) {
@@ -62,14 +64,15 @@ export async function runTests(
         }
       }
 
+      const failedCount = code && code !== 0 ? 1 : 0;
       resolve({
-        success: code === 0,
+        success: isSuccessful(code, failedCount),
         failures: [],
         summary: {
           passed: 0,
-          failed: code && code !== 0 ? 1 : 0,
+          failed: failedCount,
           skipped: 0,
-          total: code && code !== 0 ? 1 : 0,
+          total: failedCount,
           durationMs: 0
         }
       });
@@ -86,7 +89,7 @@ async function ensureDirectory(dir: string): Promise<void> {
 }
 
 function parseResultsDirectory(command: string): string | undefined {
-  const match = command.match(/--results-directory\s+((?:\"[^\"]+\")|(?:'[^']+')|[^\\s]+)/);
+  const match = command.match(/--results-directory\s+((?:"[^"]+")|(?:'[^']+')|[^\s]+)/);
   if (!match) {
     return undefined;
   }
@@ -163,16 +166,21 @@ async function parseTrx(trxPath: string): Promise<TestRunResult> {
   return { success: failures.length === 0, failures, summary, resultsFile: trxPath };
 }
 
+function isSuccessful(exitCode: number | null, failureCount: number): boolean {
+  return failureCount === 0 && (exitCode === 0 || exitCode === null);
+}
+
 function parseDuration(duration: string): number {
   // Format: HH:MM:SS.mmmmmm
-  const match = duration.match(/(?<h>\\d+):(?<m>\\d+):(?<s>\\d+)(?:\\.(?<ms>\\d+))?/);
-  if (!match || !match.groups) {
+  const [hoursPart, minutesPart, secondsPart] = duration.split(':');
+  if (!hoursPart || !minutesPart || !secondsPart) {
     return 0;
   }
-  const hours = Number(match.groups.h);
-  const minutes = Number(match.groups.m);
-  const seconds = Number(match.groups.s);
-  const milliseconds = Number((match.groups.ms ?? '0').slice(0, 3));
+  const [secondsStr, fraction = '0'] = secondsPart.split('.');
+  const hours = Number(hoursPart) || 0;
+  const minutes = Number(minutesPart) || 0;
+  const seconds = Number(secondsStr) || 0;
+  const milliseconds = Number(fraction.padEnd(3, '0').slice(0, 3)) || 0;
   return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
 }
 
