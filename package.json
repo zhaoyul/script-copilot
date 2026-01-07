@@ -6,7 +6,6 @@
   "publisher": "your-publisher",
   "license": "MIT",
   "main": "./out/extension.js",
-  "icon": "resources/icon.svg",
   "engines": {
     "vscode": "^1.70.0"
   },
