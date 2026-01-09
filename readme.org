@@ -22,15 +22,18 @@ DeepSeek C# Assistant 是一个基于 VS Code 的独立扩展.用于辅助编写
 
 - 在 VS Code 中如何使用
 1. 先在 VS Code 打开你的 C# 项目或解决方案,确保已安装 .NET SDK 与 Node.js.
-2. 克隆仓库后执行 =npm install && npm run build= 以编译扩展;如构建失败,确认 Node 版本满足要求,删除 =node_modules= 后再执行 =npm install=.
+2. 克隆仓库后执行 =npm install && npm run build= 以编译扩展;如构建失败,确认 Node 版本满足要求,删除 =node_modules= 后再执行 =npm install= 与 =npm run build=.
 3. 运行方式(二选一):  
    - 调试: 在仓库根目录按 =F5= 启动 Extension Development Host。  
-   - 已打包安装: 运行 =vsce package= 生成 VSIX,在 VS Code 里选择 "Install from VSIX..." 安装。
+   - 已打包安装: 运行 =vsce package= 生成 VSIX(如未安装 vsce,先执行 =npm install -g vsce=),在 VS Code 里选择 "Install from VSIX..." 安装。
 4. 在 Host/安装好的 VS Code 窗口中打开 Settings 并搜索 =deepseekCSharp= 或 =DeepSeek C# Assistant=:  
    - 必需: 配置 =apiUrl= 与 =apiKey= (也可在 =.vscode/settings.json= 中填写).  
    - 可选: 启用 =autoRunTests=、调整 =testsCommand=、并发数等高级设置.
 5. 打开任意 .cs 文件,在需要生成代码的位置放置光标,通过命令面板执行 "DeepSeek: C# Assist" 或在右键菜单中选择同名命令.
-6. 在弹出的预览中审阅生成的代码,点击 Insert 写入文件;如果在设置中已启用 =autoRunTests=,扩展会自动运行 dotnet test 并在输出与 Webview 中展示结果。
+6. 在弹出的预览中:
+   - 审阅生成的代码;
+   - 点击 Insert 将代码写入文件;
+   - 如果在设置中启用 =autoRunTests=,扩展会自动运行 dotnet test 并在输出与 Webview 中展示结果。
 
 - 快速开始
 1. 克隆仓库.
