@@ -38,8 +38,8 @@
       "properties": {
         "deepseekCSharp.assistant.apiUrl": {
           "type": "string",
-          "default": "",
-          "description": "Endpoint for DeepSeek generation requests."
+          "default": "https://api.deepseek.com/v1/chat/completions",
+          "description": "Endpoint for DeepSeek generation requests (e.g. https://api.deepseek.com/v1/chat/completions)."
         },
         "deepseekCSharp.assistant.apiKey": {
           "type": "string",
@@ -48,12 +48,12 @@
         },
         "deepseekCSharp.assistant.model": {
           "type": "string",
-          "default": "deepseek-code-1",
+          "default": "deepseek-chat",
           "description": "Model name used for generation."
         },
         "deepseekCSharp.assistant.useChatApi": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Use chat-style API payloads (messages) instead of prompt-only payloads."
         },
         "deepseekCSharp.assistant.timeoutMs": {

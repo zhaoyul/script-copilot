@@ -231,10 +231,10 @@ function getWorkingDirectory(): string {
 function readConfiguration(): AssistantConfiguration {
   const config = vscode.workspace.getConfiguration('deepseekCSharp.assistant');
   return {
-    apiUrl: config.get<string>('apiUrl', ''),
+    apiUrl: config.get<string>('apiUrl', 'https://api.deepseek.com/v1/chat/completions'),
     apiKey: config.get<string>('apiKey', ''),
-    model: config.get<string>('model', 'deepseek-code-1'),
-    useChatApi: config.get<boolean>('useChatApi', false),
+    model: config.get<string>('model', 'deepseek-chat'),
+    useChatApi: config.get<boolean>('useChatApi', true),
     timeoutMs: config.get<number>('timeoutMs', 30000),
     maxTokens: config.get<number>('maxTokens', 1024),
     temperature: config.get<number>('temperature', 0),

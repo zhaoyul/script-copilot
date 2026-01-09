@@ -45,9 +45,10 @@ DeepSeek C# Assistant 是一个基于 VS Code 的独立扩展.用于辅助编写
 - 配置(settings.json 示例)
 #+BEGIN_SRC json
 {
-  "deepseekCSharp.assistant.apiUrl": "https://api.deepseek.example/v1/generate",
+  "deepseekCSharp.assistant.apiUrl": "https://api.deepseek.com/v1/chat/completions",
   "deepseekCSharp.assistant.apiKey": "<YOUR_API_KEY>",
-  "deepseekCSharp.assistant.model": "deepseek-code-1",
+  "deepseekCSharp.assistant.model": "deepseek-chat",
+  "deepseekCSharp.assistant.useChatApi": true,
   "deepseekCSharp.assistant.timeoutMs": 30000,
   "deepseekCSharp.assistant.maxTokens": 1024,
   "deepseekCSharp.assistant.temperature": 0.0,
@@ -60,6 +61,8 @@ DeepSeek C# Assistant 是一个基于 VS Code 的独立扩展.用于辅助编写
   "deepseekCSharp.assistant.maxConcurrentRequests": 2
 }
 #+END_SRC
+
+说明: DeepSeek API 与 OpenAI 兼容, 官方 base_url 为 https://api.deepseek.com (亦可使用 https://api.deepseek.com/v1). 对话生成建议使用完整端点 https://api.deepseek.com/v1/chat/completions (或不带 /v1 的等价地址).
 
 安全提示:API Key 应使用 VS Code SecretStorage 或系统 Keychain 存储.切勿把明文 key 提交到仓库.
 
@@ -135,13 +138,13 @@ dotnet test --logger "trx;LogFileName=results.trx" --results-directory ./deepsee
 #+END_SRC
 
 - 与 LLM 的交互(示例)
-- POST {apiUrl}/v1/generate  
+- POST https://api.deepseek.com/v1/chat/completions  
 - Headers: Authorization: Bearer <API_KEY>, Content-Type: application/json  
 - Body 示例:
 #+BEGIN_SRC json
 {
-  "model": "deepseek-code-1",
-  "prompt": "<constructed-prompt-with-context>",
+  "model": "deepseek-chat",
+  "messages": [{ "role": "user", "content": "<constructed-prompt-with-context>" }],
   "max_tokens": 1024,
   "temperature": 0.0
 }
